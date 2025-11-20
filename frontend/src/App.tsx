@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import STLViewer from './components/STLViewer';
+import { Sun, Moon } from 'lucide-react';
 
 interface GenerationResult {
   step: string;
@@ -20,7 +21,7 @@ interface GCodeSettings {
 
 function App() {
   const [prompt, setPrompt] = useState<string>(
-    'generate cadquery script for a sphere with a diameter of 40mm at the origin'
+    'Generate a SpurGear having 20 teeth, a module of 2.0, a width of 12.0, and helix angle of 25.0.'
   );
   const [promptHistory, setPromptHistory] = useState<string[]>([]);
   const [result, setResult] = useState<GenerationResult | null>(null);
@@ -29,8 +30,9 @@ function App() {
   const [showViewer, setShowViewer] = useState<boolean>(true);
   const [supportedLibraries, setSupportedLibraries] = useState<string[]>([]);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
 
-  // G-code feature states
+  // G-code feature
   const [showGCodePanel, setShowGCodePanel] = useState<boolean>(false);
   const [gcodeSettings, setGcodeSettings] = useState<GCodeSettings>({
     layer_height: 0.2,
@@ -42,31 +44,31 @@ function App() {
   const [gcodeStatus, setGcodeStatus] = useState<GCodeStatus>('idle');
   const [gcodeFile, setGcodeFile] = useState<string | null>(null);
 
-  // Fetch available libraries
+  // Fetch supported libraries
   useEffect(() => {
     const fetchLibraries = async () => {
       try {
-        const response = await fetch('/api/libraries');
-        const data = await response.json();
+        const res = await fetch('/api/libraries');
+        const data = await res.json();
         if (data.libraries) {
           const names = data.libraries.map((l: any) => l.name);
           setSupportedLibraries(names);
         }
       } catch (err) {
-        console.error('Failed to fetch supported libraries:', err);
+        console.error('Failed to fetch libraries:', err);
       }
     };
     fetchLibraries();
   }, []);
 
-  // Poll backend for model generation status
+  // Poll backend for generation status
   useEffect(() => {
     if (status !== 'pending' && status !== 'processing') return;
 
     const intervalId = setInterval(async () => {
       try {
-        const response = await fetch('/api/generation-status');
-        const data = await response.json();
+        const res = await fetch('/api/generation-status');
+        const data = await res.json();
 
         if (data.status === 'complete') {
           setStatus('complete');
@@ -81,9 +83,7 @@ function App() {
           clearInterval(intervalId);
         } else if (data.status === 'error') {
           setStatus('error');
-          setError(
-            data.error_message || 'An unknown error occurred during generation.'
-          );
+          setError(data.error_message || 'An unknown error occurred.');
           clearInterval(intervalId);
         } else {
           setStatus(data.status);
@@ -133,15 +133,11 @@ function App() {
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  // G-code generation
   const handleGenerateGCode = async () => {
     if (!result?.stl) return;
     setGcodeStatus('processing');
     setError(null);
-
-    const filename = new URL(result.stl, window.location.origin).searchParams.get(
-      'filename'
-    );
+    const filename = new URL(result.stl, window.location.origin).searchParams.get('filename');
 
     try {
       const response = await fetch('/api/generate-gcode', {
@@ -149,7 +145,6 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename, ...gcodeSettings }),
       });
-
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.detail || 'Failed to generate G-code.');
@@ -168,273 +163,175 @@ function App() {
   const isLoading = status === 'pending' || status === 'processing';
 
   return (
-    <div className="bg-gray-50 min-h-screen font-sans">
-      <div className="container mx-auto max-w-6xl p-5">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">
-            Text-to-CAD Generator
-          </h1>
-          <p className="text-gray-600">
-            Enter a natural language description of the 3D model you want to
-            create.
-          </p>
-          {supportedLibraries.length > 0 && (
-            <p className="text-sm text-gray-500 mt-2">
-              Supported libraries: {supportedLibraries.join(', ')}
-            </p>
+    <div className={`${isDarkMode ? 'bg-[#0d1117] text-gray-200' : 'bg-gray-50 text-gray-800'} min-h-screen transition-all duration-300 flex flex-col`}>
+      {/* Header */}
+      <header className={`flex items-center justify-between px-8 py-5 border-b ${isDarkMode ? 'border-gray-800' : 'border-gray-300'} shadow-md`}>
+        <div className="w-8" />
+        <h1 className="text-3xl font-semibold tracking-tight text-center flex-1">Text-to-CAD Generator</h1>
+        <button
+          onClick={() => setIsDarkMode(!isDarkMode)}
+          className="p-2 rounded-lg hover:bg-gray-700 transition"
+          title="Toggle Theme"
+        >
+          {isDarkMode ? <Sun className="text-yellow-400" /> : <Moon className="text-gray-800" />}
+        </button>
+      </header>
+
+      {/* Main content */}
+      <main className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-7xl mx-auto w-full p-8">
+        {/* LEFT PANEL */}
+        <div className={`flex flex-col justify-between p-6 rounded-2xl shadow-lg border ${isDarkMode ? 'bg-[#1a1f29] border-gray-800' : 'bg-white border-gray-200'}`}>
+          {/* Prompt History */}
+          <div className="overflow-y-auto flex-1 space-y-3 pr-1 pb-4">
+            {promptHistory.length === 0 ? (
+              <p className="text-gray-500 text-center mt-8">Your prompt history will appear here.</p>
+            ) : (
+              promptHistory.map((p, idx) => (
+                <div
+                  key={idx}
+                  className={`flex items-center justify-between px-3 py-2 rounded-lg ${isDarkMode ? 'bg-[#2a2f3a]' : 'bg-gray-100'}`}
+                >
+                  <span className="flex-grow mr-3 break-all">{p}</span>
+                  <button
+                    onClick={() => handleCopy(p, idx)}
+                    className={`text-sm font-semibold ${copiedIndex === idx ? 'text-green-400' : 'text-gray-400 hover:text-gray-200'}`}
+                  >
+                    {copiedIndex === idx ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Input */}
+          <form onSubmit={handleSubmit} className="mt-4 border-t pt-4 space-y-4">
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Describe your 3D model (e.g., a gear with 20 teeth...)"
+              rows={4}
+              disabled={isLoading}
+              className={`w-full p-3 rounded-xl border shadow-sm focus:ring-2 focus:ring-green-500 focus:outline-none disabled:opacity-60 ${
+                isDarkMode
+                  ? 'bg-[#0d1117] border-gray-700 text-gray-200 placeholder-gray-500'
+                  : 'bg-white border-gray-300 text-gray-800'
+              }`}
+            />
+            <button
+              type="submit"
+              disabled={isLoading || !prompt.trim()}
+              className="w-full bg-green-600 text-white font-semibold py-3 rounded-lg shadow-md hover:bg-green-700 disabled:opacity-50 transition"
+            >
+              {isLoading ? `Processing... (${status})` : 'Generate CAD'}
+            </button>
+          </form>
+
+          {/* G-code Settings (Moved to Left Panel) */}
+          {status === 'complete' && result && (
+            <div className="mt-6 border-t pt-4">
+              {!showGCodePanel ? (
+                <button
+                  onClick={() => setShowGCodePanel(true)}
+                  className="w-full bg-[#34384a] hover:bg-[#454a5a] text-gray-200 py-2 rounded transition flex items-center justify-center gap-2"
+                >
+                  ⚙️ Configure G-code
+                </button>
+              ) : (
+                <div className="p-4 rounded-lg border border-gray-600 bg-[#0d1117]">
+                  <div className="flex justify-between items-center mb-3">
+                    <h4 className="text-sm font-semibold text-green-400">
+                      Print Settings
+                    </h4>
+                    <button
+                      onClick={() => setShowGCodePanel(false)}
+                      className="text-gray-400 hover:text-gray-200"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3 text-xs mb-4">
+                    {Object.entries(gcodeSettings).map(([key, val]) => (
+                      <label key={key} className="flex flex-col gap-1">
+                        <span className="text-gray-400 capitalize">{key.replace('_', ' ')}</span>
+                        <input
+                          type="number"
+                          value={val}
+                          onChange={(e) =>
+                            setGcodeSettings({
+                              ...gcodeSettings,
+                              [key]: parseFloat(e.target.value),
+                            })
+                          }
+                          className="p-1.5 rounded bg-[#1a1f29] border border-gray-700 text-gray-200 focus:border-green-500 focus:outline-none"
+                        />
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={handleGenerateGCode}
+                      disabled={gcodeStatus === 'processing'}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded font-medium transition disabled:opacity-50"
+                    >
+                      {gcodeStatus === 'processing' ? 'Generating...' : 'Generate G-code'}
+                    </button>
+                    
+                    {gcodeStatus === 'complete' && gcodeFile && (
+                      <a
+                        href={gcodeFile}
+                        download
+                        className="block w-full text-center bg-[#1a1f29] border border-green-500/30 text-green-400 py-2 rounded hover:bg-[#2a2f3a] transition"
+                      >
+                        Download .gcode
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* LEFT PANEL */}
-          <div className="space-y-6">
-            <div className="bg-white border border-gray-200 rounded-lg p-4 mb-2 max-h-60 overflow-y-auto shadow-sm">
-              {promptHistory.length === 0 ? (
-                <p className="text-gray-400 text-center">
-                  Your prompt history will appear here.
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {promptHistory.map((p, idx) => (
-                    <li
-                      key={idx}
-                      className="flex items-center justify-between bg-gray-100 rounded px-3 py-2 text-gray-800 text-sm"
-                    >
-                      <span className="flex-grow mr-3 break-all">{p}</span>
-                      <button
-                        onClick={() => handleCopy(p, idx)}
-                        className={`flex-shrink-0 text-gray-600 hover:text-gray-900 font-semibold py-1 px-2 rounded transition flex items-center gap-1 ${
-                          copiedIndex === idx ? 'text-green-600' : ''
-                        }`}
-                      >
-                        {copiedIndex === idx ? 'Copied!' : 'Copy'}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+        {/* RIGHT PANEL */}
+        <div className={`flex flex-col justify-center items-center rounded-2xl p-6 shadow-lg border ${isDarkMode ? 'bg-[#1a1f29] border-gray-800' : 'bg-white border-gray-200'}`}>
+          {status === 'complete' && result && showViewer ? (
+            <div className="w-full flex flex-col items-center">
+              <h3 className="text-lg font-semibold mb-3 text-center text-green-400">3D Preview</h3>
+              <div className="bg-[#2a2f3a] rounded-lg overflow-hidden border border-gray-700 w-full h-[450px]">
+                <STLViewer url={result.stl} />
+              </div>
+              <p className="text-sm text-gray-400 text-center mt-3">
+                Click and drag to rotate • Mouse wheel to zoom
+              </p>
             </div>
+          ) : isLoading ? (
+            <div className="flex flex-col items-center justify-center text-gray-400 animate-pulse">
+              <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+              Generating your 3D model...
+            </div>
+          ) : (
+            <div className="text-center text-gray-400">
+              <p className="text-lg font-medium">Ready to Generate ✨</p>
+              <p className="text-xs mt-1">
+                Enter a description and click "Generate CAD"
+              </p>
+            </div>
+          )}
 
-            {/* PROMPT FORM */}
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="e.g., a spur gear with 20 teeth, module 1.5, and width 10mm"
-                rows={4}
-                disabled={isLoading}
-                className="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-100 transition"
-              />
-              <button
-                type="submit"
-                disabled={isLoading || !prompt.trim()}
-                className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
-              >
-                {isLoading ? `Processing... (${status})` : 'Generate CAD'}
-              </button>
-            </form>
-
-            {status === 'error' && error && (
-              <div className="p-4 rounded-lg bg-red-100 border border-red-400 text-red-700">
-                <strong>Error:</strong> {error}
+          {/* Download Buttons */}
+          {status === 'complete' && result && (
+            <div className="w-full mt-6 space-y-4">
+              <div className="flex gap-4">
+                <a href={result.step} download className="flex-1 text-center bg-green-600 hover:bg-green-700 text-white py-2 rounded transition">⬇ STEP</a>
+                <a href={result.stl} download className="flex-1 text-center bg-green-600 hover:bg-green-700 text-white py-2 rounded transition">⬇ STL</a>
               </div>
-            )}
 
-            {/* RESULT */}
-            {status === 'complete' && result && (
-              <div className="p-6 rounded-lg bg-green-100 border border-green-400">
-                <h3 className="text-lg font-semibold text-green-800 mb-2">
-                  Generation Complete!
-                </h3>
-                <p className="text-green-700 mb-4">
-                  Your model files are ready for download.
-                </p>
-
-                <div className="space-y-3">
-                  <div className="flex gap-3">
-                    <a
-                      href={result.step}
-                      download
-                      className="flex-1 text-center bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition"
-                    >
-                      Download .STEP
-                    </a>
-                    <a
-                      href={result.stl}
-                      download
-                      className="flex-1 text-center bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition"
-                    >
-                      Download .STL
-                    </a>
-                  </div>
-
-                  {/* NEW: G-code Feature */}
-                  <div className="pt-3">
-                    {!showGCodePanel ? (
-                      <button
-                        onClick={() => setShowGCodePanel(true)}
-                        className="w-full bg-yellow-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-yellow-600 transition"
-                      >
-                        G-code Settings
-                      </button>
-                    ) : (
-                      <div className="bg-white p-4 rounded-lg border border-yellow-400 shadow-sm mt-3">
-                        <h4 className="text-lg font-semibold text-yellow-700 mb-2">
-                          G-code Settings
-                        </h4>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <label>
-                            Layer Height (mm)
-                            <input
-                              type="number"
-                              step="0.05"
-                              value={gcodeSettings.layer_height}
-                              onChange={(e) =>
-                                setGcodeSettings({
-                                  ...gcodeSettings,
-                                  layer_height: parseFloat(e.target.value),
-                                })
-                              }
-                              className="w-full border border-gray-300 rounded p-1"
-                            />
-                          </label>
-                          <label>
-                            Infill (%)
-                            <input
-                              type="number"
-                              value={gcodeSettings.infill_density}
-                              onChange={(e) =>
-                                setGcodeSettings({
-                                  ...gcodeSettings,
-                                  infill_density: parseInt(e.target.value),
-                                })
-                              }
-                              className="w-full border border-gray-300 rounded p-1"
-                            />
-                          </label>
-                          <label>
-                            Speed (mm/s)
-                            <input
-                              type="number"
-                              value={gcodeSettings.print_speed}
-                              onChange={(e) =>
-                                setGcodeSettings({
-                                  ...gcodeSettings,
-                                  print_speed: parseInt(e.target.value),
-                                })
-                              }
-                              className="w-full border border-gray-300 rounded p-1"
-                            />
-                          </label>
-                          <label>
-                            Nozzle Temp (°C)
-                            <input
-                              type="number"
-                              value={gcodeSettings.nozzle_temp}
-                              onChange={(e) =>
-                                setGcodeSettings({
-                                  ...gcodeSettings,
-                                  nozzle_temp: parseInt(e.target.value),
-                                })
-                              }
-                              className="w-full border border-gray-300 rounded p-1"
-                            />
-                          </label>
-                          <label>
-                            Bed Temp (°C)
-                            <input
-                              type="number"
-                              value={gcodeSettings.bed_temp}
-                              onChange={(e) =>
-                                setGcodeSettings({
-                                  ...gcodeSettings,
-                                  bed_temp: parseInt(e.target.value),
-                                })
-                              }
-                              className="w-full border border-gray-300 rounded p-1"
-                            />
-                          </label>
-                        </div>
-                        <div className="mt-4 flex gap-2">
-                          <button
-                            onClick={handleGenerateGCode}
-                            disabled={gcodeStatus === 'processing'}
-                            className="flex-1 bg-yellow-600 text-white py-2 px-3 rounded font-semibold hover:bg-yellow-700 transition"
-                          >
-                            {gcodeStatus === 'processing'
-                              ? 'Generating...'
-                              : 'Generate G-code'}
-                          </button>
-                          <button
-                            onClick={() => setShowGCodePanel(false)}
-                            className="flex-1 bg-gray-300 text-gray-700 py-2 px-3 rounded font-semibold hover:bg-gray-400 transition"
-                          >
-                            Close
-                          </button>
-                        </div>
-                        {gcodeStatus === 'complete' && gcodeFile && (
-                          <div className="mt-3 text-center">
-                            <a
-                              href={gcodeFile}
-                              download
-                              className="text-yellow-700 font-semibold underline"
-                            >
-                              Download G-code File
-                            </a>
-                          </div>
-                        )}
-                        {gcodeStatus === 'error' && (
-                          <p className="text-red-600 mt-2 text-sm text-center">
-                            G-code generation failed.
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-center pt-2">
-                    <button
-                      onClick={() => setShowViewer(!showViewer)}
-                      className="text-green-700 hover:text-green-800 font-medium underline"
-                    >
-                      {showViewer ? 'Hide' : 'Show'} 3D Preview
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* RIGHT PANEL */}
-          <div className="flex flex-col items-center justify-center min-h-[400px]">
-            {status === 'complete' && result && showViewer ? (
-              <div className="w-full">
-                <h3 className="text-lg font-semibold text-gray-800 mb-3 text-center">
-                  3D Preview
-                </h3>
-                <div className="bg-white rounded-lg overflow-hidden border border-gray-300 shadow-sm">
-                  <STLViewer url={result.stl} />
-                </div>
-                <p className="text-sm text-gray-600 text-center mt-2">
-                  Click and drag to rotate • Mouse wheel to zoom
-                </p>
-              </div>
-            ) : isLoading ? (
-              <div className="w-full max-w-md p-8 border-2 border-dashed border-gray-300 rounded-lg text-center text-gray-500">
-                <p>Generating your 3D model...</p>
-              </div>
-            ) : (
-              <div className="w-full max-w-md p-8 border-2 border-dashed border-gray-300 rounded-lg text-center text-gray-500">
-                <p>Ready to Generate</p>
-                <p className="text-xs mt-1">
-                  Enter a description and click "Generate CAD" to create your 3D
-                  model
-                </p>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

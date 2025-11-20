@@ -1,0 +1,8 @@
+{
+    "terminal.integrated.defaultProfile.windows": "PowerShell",
+    "terminal.integrated.shellIntegration.enabled": false,
+    "terminal.integrated.enableVisualBell": false,
+    "terminal.integrated.decorators.enabled": false,
+    "terminal.integrated.showShellIntegrationBadge": false,
+    "terminal.integrated.hover.enabled": false
+}
